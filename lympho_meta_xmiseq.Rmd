@@ -311,10 +311,10 @@ rm(df,clinic,inter,dt)
 for (i in cancer_types){
   lymp_meta_separator(dir = str_c(setdir,'\\tcga_data\\',i,'\\normalized_rna.csv') #counts
                       ,clinic_dir = str_c(setdir,'\\tcga_data\\',i,'\\TCGA-',i,'-clinical.csv')
-                      ,setwd = str_c(setdir,'\\tcga_data\\',i), op="men")
+                      ,setwd = str_c(setdir,'\\tcga_data\\',i), op="bol")
   lymp_meta_separator(dir = str_c(setdir,'\\tcga_data\\',i,'\\normalized_mi.csv') #miRNAs
                       ,clinic_dir = str_c(setdir,'\\tcga_data\\',i,'\\TCGA-',i,'-clinical.csv')
-                      ,setwd = str_c(setdir,'\\tcga_data\\',i), op="men")
+                      ,setwd = str_c(setdir,'\\tcga_data\\',i), op="bol")
 }
 for (i in cancer_types){
   for (j in classes){
