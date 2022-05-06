@@ -107,16 +107,24 @@ tnm_statistic<-function(dir){
   clinic=clinic[which(str_sub(clinic$ajcc_pathologic_m,1,2)!='MX' &
                       str_sub(clinic$ajcc_pathologic_t,1,2)!='TX' &
                       str_sub(clinic$ajcc_pathologic_n,1,2)!='NX'),]
-  #n-metastasis
-  meta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)!='N0'),] 
-  meta=meta[which(str_sub(meta$ajcc_pathologic_t,1,2)!='T0'),] 
-  meta=meta[which(str_sub(meta$ajcc_pathologic_m,1,2)!='M1'),]
-  #non-n-metastasis
+  #n
+  n=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)!='N0'),] 
+  n=n[which(str_sub(n$ajcc_pathologic_t,1,2)!='T0'),] 
+  n=n[which(str_sub(n$ajcc_pathologic_m,1,2)!='M1'),]
+  #non-metastasis
   nonmeta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)=='N0'),] 
   nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_t,1,2)!='T0'),] 
   nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_m,1,2)!='M1'),] 
-  cat(str_c("\nnum of meta: ",nrow(meta)," ,num of non-meta: ",nrow(nonmeta),"\n"))
-  res<-c(nrow(meta),nrow(nonmeta))
+  #m
+  m=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)=='N0'),] 
+  m=m[which(str_sub(m$ajcc_pathologic_t,1,2)!='T0'),] 
+  m=m[which(str_sub(m$ajcc_pathologic_m,1,2)=='M1'),]
+  #n&m
+  nm=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)!='N0'),] 
+  nm=nm[which(str_sub(nm$ajcc_pathologic_t,1,2)!='T0'),] 
+  nm=nm[which(str_sub(nm$ajcc_pathologic_m,1,2)=='M1'),]
+  # cat(str_c("\nnum of meta: ",nrow(meta)," ,num of non-meta: ",nrow(nonmeta),"\n"))
+  res<-c(nrow(nonmeta),nrow(n), nrow(m), nrow(nm))
   return(res)
 }
 ##################################################################################################
