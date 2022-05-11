@@ -765,7 +765,7 @@ spearman<-function(mat,filter){#calculate scc
   library(igraph)
   
   s_t<-Sys.time()
-  scc<-cor(scale(as.matrix(t(mat))),method="pearson")
+  scc<-cor(as.matrix(t(mat)),method="pearson")
   
   scc[is.na(scc)] <- 0
   
@@ -831,12 +831,6 @@ spearman_ceRNA<-function(interaction_tab,ex1,ex2,filter){
       cl,      
       1:nrow(interaction_tab),    #whole number of combinations 
       function(i) {
-        # cox_all=matrix(nrow = 1, ncol = 1)
-        # i=1
-        
-        # ce1_1<-as.character(interaction_tab[i,1])
-        # ce2_1<-as.character(interaction_tab[i,2])
-        # s1<-cbind(t(ex1[ce1_1,]), t(ex2[ce2_1,]))
         xcor=cor(t(ex1[interaction_tab[i,1],]),t(ex2[interaction_tab[i,2],]), method = "pearson")
         return(xcor)
       }  
@@ -898,6 +892,8 @@ delta_pcc_ceRNA<-function(pair_tab,normal_g,normal_mi,target_g,target_mi){
   # normal_g<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\normal_normalized_g.csv"),row.names = 1, check.names = F)
   # normal_mi<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\normal_normalized_mi.csv"),row.names = 1, check.names = F)
   
+  st<-Sys.time()
+  
   nodes<-unique(c(pair_tab[,1],pair_tab[,2]))
   
   normal_g<-normal_g[row.names(normal_g)%in%nodes,]
@@ -932,12 +928,65 @@ delta_pcc_ceRNA<-function(pair_tab,normal_g,normal_mi,target_g,target_mi){
         delta[j]<-(xcor-cor)
       }
       return(delta)
-    }  
+    }
   )
   stopCluster(cl)
   res<-cbind(pair_tab,t(scc))
   colnames(res)<-c("mi","rna",colnames(target_g))
   # res<-na.omit(res)
+  
+  et<-Sys.time()
+  
+  print(et-st)
+  
+  return(res)
+}
+##################################################################################################
+X1_delta_pcc_ceRNA<-function(pair_tab,normal_g,normal_mi,target_g,target_mi){
+  st<-Sys.time()
+  
+  nodes<-unique(c(pair_tab[,1],pair_tab[,2]))
+  
+  normal_g<-normal_g[row.names(normal_g)%in%nodes,]
+  normal_mi<-normal_mi[row.names(normal_mi)%in%nodes,]
+  target_g<-target_g[row.names(target_g)%in%nodes,]
+  target_mi<-target_mi[row.names(target_mi)%in%nodes,]
+  
+  res<-vector(mode = "list", length = nrow(pair_tab))
+  
+  for (i in 1:nrow(pair_tab)){
+    exp_g<-c(t(normal_g[pair_tab[i,2],]))
+    exp_mi<-c(t(normal_mi[pair_tab[i,1],]))
+    cor=cor(exp_g, exp_mi, method = "pearson")
+    
+    cl = makeCluster(parallel::detectCores() - 1)
+    clusterEvalQ(cl,library(ggm))
+    clusterEvalQ(cl,library(corpcor))
+    
+    clusterExport(cl,c("normal_g","normal_mi","target_g","target_mi","pair_tab","i","cor"),envir=environment())
+    
+    scc <- parSapply(#捍纺贸府
+      cl,      
+      1:ncol(target_g),    #whole number of combinations 
+      function(j) {
+        
+        exp_g<-c(t(normal_g[pair_tab[i,2],]),target_g[pair_tab[i,2],j])
+        exp_mi<-c(t(normal_mi[pair_tab[i,1],]),target_mi[pair_tab[i,1],j])
+        xcor=cor(exp_g, exp_mi, method = "pearson")
+  
+        return(xcor-cor)
+      }
+    )
+    stopCluster(cl)
+    res[i]<-list(scc)
+  }
+  
+  res<-do.call(rbind,res)
+  res<-cbind(pair_tab,res)
+  colnames(res)<-c("mi","rna",colnames(target_g))
+  
+  et<-Sys.time()
+  print(et-st)
   
   return(res)
 }
@@ -965,6 +1014,47 @@ delta_wilcox_test<-function(group1,group2,p_filter){
       
       Pvalue=tryCatch({
         Pvalue=wilcox.test(t(group1[i,]),t(group2[i,]))$p.value
+      }, warning = function(w){
+        return(2)
+      }, 
+      error = function(e) {
+        return(3)
+      }
+      )
+      return(Pvalue)
+    }  
+  )
+  stopCluster(cl)
+  res<-cbind(pair_tab,p)
+  res<-res[res[,3]<p_filter,]
+  return(res)
+}
+##################################################################################################
+delta_KW_test<-function(group1,group2,group3,p_filter){
+  # group1<-meta_delta
+  # group2<-nonmeta_delta
+  # p_filter<-0.00001
+  
+  pair_tab<-group1[,1:2]
+  group1<-group1[,3:ncol(group1)]
+  group2<-group2[,3:ncol(group2)]
+  group3<-group3[,3:ncol(group3)]
+  cl = makeCluster(parallel::detectCores() - 1)
+  clusterEvalQ(cl,library(ggm))
+  clusterEvalQ(cl,library(corpcor))
+  
+  clusterExport(cl,c("group1","group2","group3"),envir=environment())
+  
+  p <- parSapply(#捍纺贸府
+    cl,      
+    1:nrow(pair_tab),    #whole number of combinations 
+    function(i) {
+      label=c(rep(0,length(t(group1[i,]))),rep(1, length(t(group2[i,]))),rep(2, length(t(group3[i,]))))
+      delta=c(t(group1[i,]),t(group2[i,]),t(group3[i,]))
+      data=cbind(label,delta)
+      
+      Pvalue=tryCatch({
+        Pvalue=kruskal.test(delta~label,data = data)$p.value
       }, warning = function(w){
         return(2)
       }, 
@@ -1145,14 +1235,57 @@ lymp_meta_separator<-function(dir,clinic_dir,setwd, op){
     meta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)!='N0'),] 
     meta=meta[which(str_sub(meta$ajcc_pathologic_t,1,2)!='T0'),] 
     #non-n-metastasis
+    nonmeta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)=='M0'),] 
+    nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_n,1,2)=='N0'),] 
+    nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_t,1,2)!='T0'),] 
+  }else if (op=="m"){
+    #metastasis
+    meta=clinic[which(str_sub(clinic$ajcc_pathologic_t,1,2)!='T0'),] 
+    meta=meta[which(str_sub(meta$ajcc_pathologic_m,1,2)=='M1'),]
+    #non-n-metastasis
     nonmeta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)=='N0'),] 
     nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_t,1,2)!='T0'),] 
+    nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_m,1,2)=='M0'),] 
   }
   
   dt_meta<-dt[,colnames(dt)%in%(meta$submitter_id)]
   dt_nonmeta<-dt[,colnames(dt)%in%(nonmeta$submitter_id)]
   
   fwrite(dt_meta,str_c('meta_',outputname),sep = ',',row.names = T,quote = F)
+  fwrite(dt_nonmeta,str_c('nonmeta_',outputname),sep = ',',row.names = T,quote = F)
+}
+##################################################################################################
+l_ml_seperator<-function(dir,clinic_dir,setwd){
+  setwd(setwd)
+  
+  spl<-str_split(dir,'\\\\')
+  outputname<-tail(spl[[1]],1)
+  
+  dt<-read.csv(dir,row.names = 1,check.names = F)
+  
+  clinic<-read.csv(clinic_dir,row.names = 1,check.names = F)
+  clinic<-clinic[which(str_sub(clinic$ajcc_pathologic_m,1,2)!='MX' &
+                         str_sub(clinic$ajcc_pathologic_t,1,2)!='TX' &
+                         str_sub(clinic$ajcc_pathologic_n,1,2)!='NX'),]
+  
+  #non-n-metastasis
+  nonmeta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)=='N0'),]
+  nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_t,1,2)!='T0'),]
+  nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_m,1,2)=='M0'),]
+  #N
+  n=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)!='N0'),]
+  n=n[which(str_sub(n$ajcc_pathologic_t,1,2)!='T0'),]
+  n=n[which(str_sub(n$ajcc_pathologic_m,1,2)=='M0'),]
+  #M
+  m=clinic[which(str_sub(clinic$ajcc_pathologic_t,1,2)!='T0'),] 
+  m=m[which(str_sub(m$ajcc_pathologic_m,1,2)=='M1'),]
+  
+  dt_nonmeta<-dt[,colnames(dt)%in%(nonmeta$submitter_id)]
+  dt_n<-dt[,colnames(dt)%in%(n$submitter_id)]
+  dt_m<-dt[,colnames(dt)%in%(m$submitter_id)]
+  
+  fwrite(dt_m,str_c('m_',outputname),sep = ',',row.names = T,quote = F)
+  fwrite(dt_n,str_c('n_',outputname),sep = ',',row.names = T,quote = F)
   fwrite(dt_nonmeta,str_c('nonmeta_',outputname),sep = ',',row.names = T,quote = F)
 }
 ##################################################################################################
