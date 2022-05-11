@@ -45,8 +45,8 @@ use_python("C:\\Users\\249\\AppData\\Local\\Programs\\Python\\Python39\\python.e
 
 cancer_types<-c("BRCA","COAD","HNSC","LUAD","LUSC","STAD","THCA")
 
-classes<-c("meta","nonmeta")
-scc_filter<-0.4
+classes<-c("M","N","nonmeta")
+scc_filter<-0.5
 
 memory.size(max = TRUE)    # OS에서 얻은 최대 메모리 크기 = OS로부터 R이 사용 가능한 메모리
 memory.size(max = FALSE)   # 현재 사용중인 메모리 크기
@@ -282,33 +282,38 @@ rm(mi,g,pair,id,target)
 ```{r,include=FALSE}
 #generate gcn_input_net
 for (i in cancer_types){
-  meta<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\meta_ceRNA_pair.csv"), check.names = F)[,1:2]
+  M<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\M_ceRNA_pair.csv"), check.names = F)[,1:2]
+  N<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\N_ceRNA_pair.csv"), check.names = F)[,1:2]
   nonmeta<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\nonmeta_ceRNA_pair.csv"), check.names = F)[,1:2]
-  admat<-unique(rbind(meta,nonmeta))
-  inter<-inner_join(meta, nonmeta)
+  admat<-unique(rbind(M,N,nonmeta))
+  
+  inter1<-inner_join(M,N)
+  inter2<-inner_join(M,nonmeta)
+  inter3<-inner_join(N,nonmeta)
+  inter<-unique(rbind(inter1,inter2,inter3))
+  
   admat<-dplyr::setdiff(admat,inter)
   write.csv(admat,str_c(setdir,"\\tcga_data\\",i,"\\admat.csv"),row.names = F,quote = F)
   cat(str_c("intersect: ",nrow(inter)))
-  # write.csv(inter,str_c(setdir,"\\tcga_data\\",i,"\\cyto_inter.csv"),row.names = F,quote = F)
-  # inter_type<-cyto_type(unique(c(inter[,1],inter[,2])),setdir)
-  # write.csv(inter_type,str_c(setdir,"\\tcga_data\\",i,"\\cyto_inter_type.csv"),quote=F,row.names=F)
 }
-rm(meta,nonmeta,admat,inter)
+rm(M,N,nonmeta,admat,inter)
 ```
 
 ```{r,include=FALSE}
 #generate label
 for (i in cancer_types){
   #generate gcn_label file
-  meta<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\meta_ceRNA_mi.csv"),row.names = 1,check.names = F)
-  m_label<-cbind(colnames(meta),rep(1,ncol(meta)))
+  M<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\M_ceRNA_mi.csv"),row.names = 1,check.names = F)
+  M_label<-cbind(colnames(M),rep(1,ncol(M)))
+  N<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\N_ceRNA_mi.csv"),row.names = 1,check.names = F)
+  N_label<-cbind(colnames(N),rep(2,ncol(N)))
   nonmeta<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\nonmeta_ceRNA_mi.csv"),row.names = 1,check.names = F)
   nm_label<-cbind(colnames(nonmeta),rep(0,ncol(nonmeta)))
-  gctm_label<-rbind(m_label,nm_label)
+  gctm_label<-rbind(M_label,N_label,nm_label)
   colnames(gctm_label)<-c("sample_id","labels")
   write.csv(gctm_label,str_c(setdir,"\\tcga_data\\",i,"\\gctm_label.csv"),row.names = F,quote = F)
 }
-rm(meta,nonmeta,m_label,nm_label,gctm_label)
+rm(M,N,nonmeta,m_label,nm_label,gctm_label)
 ```
 ############################delta PCC###############################
 ```{r, include=FALSE}
@@ -317,30 +322,36 @@ for (i in cancer_types){
   
   admat<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\admat.csv"),check.names=F)
   
-  meta_g<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\meta_normalized_rna.csv"),row.names = 1, check.names = F)
+  M_g<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\M_normalized_rna.csv"),row.names = 1, check.names = F)
+  N_g<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\N_normalized_rna.csv"),row.names = 1, check.names = F)
   nonmeta_g<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\nonmeta_normalized_rna.csv"),row.names = 1, check.names = F)
 
-  meta_mi<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\meta_normalized_mi.csv"),row.names = 1, check.names = F)
+  M_mi<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\M_normalized_mi.csv"),row.names = 1, check.names = F)
+  N_mi<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\N_normalized_mi.csv"),row.names = 1, check.names = F)
   nonmeta_mi<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\nonmeta_normalized_mi.csv"),row.names = 1, check.names = F)
   
   normal_g<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\normal_normalized_rna.csv"),row.names = 1, check.names = F)
   normal_mi<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\normal_normalized_mi.csv"),row.names = 1, check.names = F)
   
-  meta_delta<-delta_pcc_ceRNA(admat,normal_g,normal_mi,meta_g,meta_mi)
+  M_delta<-delta_pcc_ceRNA(admat,normal_g,normal_mi,M_g,M_mi)
+  N_delta<-delta_pcc_ceRNA(admat,normal_g,normal_mi,N_g,N_mi)
   nonmeta_delta<-delta_pcc_ceRNA(admat,normal_g,normal_mi,nonmeta_g,nonmeta_mi)
   
-  wilcox<-delta_wilcox_test(meta_delta,nonmeta_delta,0.01)
+  wilcox<-delta_KW_test(M,N,nonmeta,0.01)
   write.csv(wilcox,str_c(setdir,"\\tcga_data\\",i,"\\cyto_wilcox.csv"),quote=F,row.names=F)
-  # wilcox_type<-cyto_type(unique(c(wilcox[,1],wilcox[,2])),setdir)
-  # write.csv(wilcox_type,str_c(setdir,"\\tcga_data\\",i,"\\cyto_wilcox_type.csv"),quote=F,row.names=F)
+  
   
   row.names(wilcox)<-str_c(wilcox[,1],"_",wilcox[,2])
-  meta_delta<-na.omit(meta_delta)
-  row.names(meta_delta)<-str_c(meta_delta[,1],"_",meta_delta[,2])
+  M_delta<-na.omit(M_delta)
+  row.names(M_delta)<-str_c(M_delta[,1],"_",M_delta[,2])
+  N_delta<-na.omit(N_delta)
+  row.names(N_delta)<-str_c(N_delta[,1],"_",N_delta[,2])
   nonmeta_delta<-na.omit(nonmeta_delta)
   row.names(nonmeta_delta)<-str_c(nonmeta_delta[,1],"_",nonmeta_delta[,2])
   
-  meta_delta<-meta_delta[row.names(meta_delta)%in%row.names(wilcox),]
+  M_delta<-M_delta[row.names(M_delta)%in%row.names(wilcox),]
+  N_delta<-N_delta[row.names(N_delta)%in%row.names(wilcox),]
+  N_delta<-N_delta[,3:ncol(N_delta)]
   nonmeta_delta<-nonmeta_delta[row.names(nonmeta_delta)%in%row.names(wilcox),]
   nonmeta_delta<-nonmeta_delta[,3:ncol(nonmeta_delta)]
   admat_final<-merge(meta_delta,nonmeta_delta,by="row.names")
