@@ -881,6 +881,31 @@ spearman_ceRNA<-function(interaction_tab,ex1,ex2,filter){
   }
 }
 ##################################################################################################
+X1_spearman_ceRNA<-function(interaction_tab,ex1,ex2,filter){
+  
+  # interaction_tab<-pair
+  # ex1<-g
+  # ex2<-mi
+  
+  cat('calculating scc\n')
+  
+  interaction_tab<-data.frame(interaction_tab)
+  
+  mat<-rbind(ex1,ex2)
+  
+  scc<-cor(as.matrix(t(mat)),method="spearman")
+  
+  rm(mat)
+  scc[is.na(scc)] <- 0
+  scc<-melt(scc,id.vars=c("row.names"))
+  scc<-scc[abs(scc[,3])>filter,]
+  row.names(scc)<-str_c(scc[,1],"_",scc[,2])
+  row.names(interaction_tab)<-str_c(interaction_tab[,1],"_",interaction_tab[,2])
+  scc<-scc[row.names(scc)%in%row.names(interaction_tab),]
+  colnames(scc)<-c("id","target","scc")
+  return(scc)
+}
+##################################################################################################
 delta_pcc_ceRNA<-function(pair_tab,normal_g,normal_mi,target_g,target_mi){
   # i<-"BRCA"
   # pair_tab<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\admat.csv"),check.names=F)
@@ -1205,7 +1230,7 @@ colname_add<-function(dir,str){
   write.csv(dt,dir,quote = F)
 }
 ##################################################################################################
-lymp_meta_separator<-function(dir,clinic_dir,setwd, op){
+lymp_meta_separator<-function(dir,clinic_dir,setwd,op){
   # dir<-'D:\\cancer_type_classification\\tcga_data\\KIRC\\normalized_mi.csv'
   # clinic_dir<-'D:\\cancer_type_classification\\tcga_data\\KIRC\\TCGA-KIRC-clinical.csv'
   
@@ -1235,7 +1260,7 @@ lymp_meta_separator<-function(dir,clinic_dir,setwd, op){
     meta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)!='N0'),] 
     meta=meta[which(str_sub(meta$ajcc_pathologic_t,1,2)!='T0'),] 
     #non-n-metastasis
-    nonmeta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)=='M0'),] 
+    nonmeta=clinic[which(str_sub(clinic$ajcc_pathologic_m,1,2)=='M0'),] 
     nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_n,1,2)=='N0'),] 
     nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_t,1,2)!='T0'),] 
   }else if (op=="m"){
@@ -1244,6 +1269,14 @@ lymp_meta_separator<-function(dir,clinic_dir,setwd, op){
     meta=meta[which(str_sub(meta$ajcc_pathologic_m,1,2)=='M1'),]
     #non-n-metastasis
     nonmeta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)=='N0'),] 
+    nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_t,1,2)!='T0'),] 
+    nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_m,1,2)=='M0'),] 
+  }else if (op=="mn"){
+    #metastasis
+    meta=clinic[which(str_sub(clinic$ajcc_pathologic_t,1,2)!='T0'),] 
+    meta=meta[which(str_sub(meta$ajcc_pathologic_m,1,2)=='M1'),]
+    #non-n-metastasis
+    nonmeta=clinic[which(str_sub(clinic$ajcc_pathologic_n,1,2)!='N0'),] 
     nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_t,1,2)!='T0'),] 
     nonmeta=nonmeta[which(str_sub(nonmeta$ajcc_pathologic_m,1,2)=='M0'),] 
   }

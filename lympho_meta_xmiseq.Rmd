@@ -11,7 +11,8 @@ output: github_document
 # install.R()
 # rm(list = ls())
 #install.packages("xfun")
-setwd("D:\\") # myfunc.R 이 저장된 폴더
+setwd("C:\\Users\\249\\workplace") # myfunc.R 이 저장된 폴더
+source("function2.R") # myfunc.R 의 명령어 실행
 # install.packages('dplyr','doParallel','stringr','data.table','limma','stringi','parallel','psych','ggm','corpcor','ggplot2','purrr','NetworkToolbox','reticulate')
 # install.packages('limma')
 setdir<-"D:\\lymph_meta_xmiseq"
@@ -45,6 +46,7 @@ library(hpar)
 library(enrichR)
 library(progress)
 library(tidyr)
+library(Hmisc)
 
 # if (!requireNamespace("BiocManager", quietly = TRUE))
 #     install.packages("BiocManager")
@@ -56,7 +58,6 @@ library(tidyr)
 # 
 # BiocManager::install("BioinformaticsFMRP/TCGAbiolinks")
 
-source("function2.R") # myfunc.R 의 명령어 실행
 
 use_python("C:\\Users\\249\\AppData\\Local\\Programs\\Python\\Python39\\python.exe")
 
@@ -64,8 +65,8 @@ use_python("C:\\Users\\249\\AppData\\Local\\Programs\\Python\\Python39\\python.e
 #                 ,"SKCM","COAD","STAD","BLCA","LIHC","CESC","KIRP","ESCA"
 #                 ,"PAAD","READ","TGCT","MESO","ACC","KICH"
 #                 ,"CHOL","PRAD") #THYM,GBM, no-tnm: UCEC,LGG,OV,SARC,LAML,PCPG,UCS,DLBC no-meta: UVM
-cancer_types<-c("BRCA","COAD","HNSC","LUAD","LUSC","STAD","THCA")
-# cancer_types<-c("HNSC")#THCA
+# cancer_types<-c("BRCA","COAD","HNSC","LUAD","LUSC","STAD","THCA")
+cancer_types<-c("BRCA","COAD","LUAD","STAD")#THCA
 classes<-c("meta","nonmeta")
 scc_filter<-0.4
 # cpm_filter<-1
@@ -311,10 +312,10 @@ rm(df,clinic,inter,dt)
 for (i in cancer_types){
   lymp_meta_separator(dir = str_c(setdir,'\\tcga_data\\',i,'\\normalized_rna.csv') #counts
                       ,clinic_dir = str_c(setdir,'\\tcga_data\\',i,'\\TCGA-',i,'-clinical.csv')
-                      ,setwd = str_c(setdir,'\\tcga_data\\',i), op="bol")
+                      ,setwd = str_c(setdir,'\\tcga_data\\',i), op="men")
   lymp_meta_separator(dir = str_c(setdir,'\\tcga_data\\',i,'\\normalized_mi.csv') #miRNAs
                       ,clinic_dir = str_c(setdir,'\\tcga_data\\',i,'\\TCGA-',i,'-clinical.csv')
-                      ,setwd = str_c(setdir,'\\tcga_data\\',i), op="bol")
+                      ,setwd = str_c(setdir,'\\tcga_data\\',i), op="men")
 }
 for (i in cancer_types){
   for (j in classes){
@@ -334,7 +335,7 @@ for (i in cancer_types){
     id<-rownames(mi)
     target<-rownames(g)
     pair<-tidyr::crossing(id, target)
-    pair<-spearman_ceRNA(pair,mi,g,scc_filter)
+    pair<-X1_spearman_ceRNA(pair,mi,g,scc_filter)
     mi<-mi[rownames(mi)%in%unique(pair[,1]),]
     fwrite(mi,str_c(setdir,"\\tcga_data\\",i,"\\",j,"_ceRNA_mi.csv"),sep = ',',row.names = T,quote = F)
     g<-g[rownames(g)%in%unique(pair[,2]),]
@@ -379,8 +380,9 @@ rm(meta,nonmeta,m_label,nm_label,gctm_label)
 ```
 ############################delta PCC###############################
 ```{r, include=FALSE}
+pb <- progress_bar$new(total = length(cancer_types))
 for (i in cancer_types){
-  # i<-'BRCA'
+  # i<-'COAD'
   
   admat<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\admat.csv"),check.names=F)
   
@@ -415,16 +417,18 @@ for (i in cancer_types){
   
   write.csv(admat_final,str_c(setdir,"\\tcga_data\\",i,"\\admat_final.csv"),quote=F,row.names=F)
   
-#   dir.create(str_c(setdir,"\\tcga_data\\",i,"\\admats"))
-#   
-#   for (j in 3:ncol(admat_final)){
-#     tmp<-cbind(admat_final[,1:2],admat_final[,j])
-#     colnames(tmp)<-c("source","target","weight")
-#     write.csv(tmp,str_c(setdir,"\\tcga_data\\",i,"\\admats\\",colnames(admat_final)[j],".csv"),quote=F,row.names=F)
-#   }
-#   
-#   gctm<-read.csv(str_c(setdir,"\\tcga_data\\",i,"\\gctm.csv"),row.names=1,check.names=F)
-#   gctm<-gctm[row.names(gctm)%in%unique(c(admat_final[,1],admat_final[,2])),]
-#   write.csv(gctm,str_c(setdir,"\\tcga_data\\",i,"\\gctm.csv"),quote=F)
+  pb$tick()
 }
+rm(admat,meta_g,meta_mi,nonmeta_g,nonmeta_mi,meta_delta,nonmeta_delta,wilcox,admat_final)
 ```
+
+```{r, include=FALSE}
+static<-list()
+for (i in cancer_types){
+  res<-tnm_statistic(str_c(setdir,'\\tcga_data\\',i,'\\TCGA-',i,'-clinical.csv'))
+  static<-append(static,list(res))
+}
+mat<-do.call(rbind,static)
+colnames(mat)<-c("nonmeta","L", "M", "ML")
+```
+
